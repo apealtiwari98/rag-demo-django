@@ -1,0 +1,367 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-09-30T02:56:12.062111+00:00",
+  "__export_source": "documento:make_insomnia.py",
+  "resources": [
+    {
+      "_id": "wrk_documento",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "Documento",
+      "description": "Django/DRF RAG API",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_documento",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8000/api/v1",
+        "email": "ada@example.com",
+        "password": "password123",
+        "access_token": "",
+        "refresh_token": "",
+        "document_id": ""
+      }
+    },
+    {
+      "_id": "env_local",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "Local",
+      "data": {
+        "base_url": "http://localhost:8000/api/v1"
+      },
+      "color": "#4caf50"
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_documento",
+      "name": "1. Auth",
+      "metaSortKey": 1
+    },
+    {
+      "_id": "req_users_create",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Sign up",
+      "description": "Open registration. Run once.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/users/",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.email }}\",\n  \"password\": \"{{ _.password }}\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": 2,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_auth_token",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Get token",
+      "description": "The after-response script stores `access` / `refresh` in the environment for every other request.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/token/",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.email }}\",\n  \"password\": \"{{ _.password }}\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": 3,
+      "settingSendCookies": true,
+      "settingStoreCookies": true,
+      "afterResponseScript": "// Runs after the response arrives; stores the JWTs for every other request.\nif (insomnia.response.code === 200) {\n  const body = insomnia.response.json();\n  insomnia.environment.set(\"access_token\", body.access);\n  insomnia.environment.set(\"refresh_token\", body.refresh);\n  console.log(\"access_token stored\");\n} else {\n  console.log(\"token request failed\", insomnia.response.code, insomnia.response.text());\n}\n"
+    },
+    {
+      "_id": "req_auth_refresh",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Refresh token",
+      "description": "",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/token/refresh/",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refresh\": \"{{ _.refresh_token }}\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": 4,
+      "settingSendCookies": true,
+      "settingStoreCookies": true,
+      "afterResponseScript": "if (insomnia.response.code === 200) {\n  insomnia.environment.set(\"access_token\", insomnia.response.json().access);\n}\n"
+    },
+    {
+      "_id": "req_users_me",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Me",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.base_url }}/users/me/",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 5,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_documents",
+      "_type": "request_group",
+      "parentId": "wrk_documento",
+      "name": "2. Documents",
+      "metaSortKey": 6
+    },
+    {
+      "_id": "req_documents_upload",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "Upload document",
+      "description": "Runs LOAD -> CHUNK -> EMBED -> STORE synchronously. Pick a file in the body tab. The after-response script stores the returned `id` as document_id.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/documents/upload/",
+      "headers": [],
+      "parameters": [],
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "file",
+            "type": "file",
+            "fileName": "",
+            "description": "md / txt / csv / json / pdf"
+          },
+          {
+            "name": "title",
+            "value": "",
+            "disabled": true
+          }
+        ]
+      },
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 7,
+      "settingSendCookies": true,
+      "settingStoreCookies": true,
+      "afterResponseScript": "// Point the detail / chunks / reindex / delete requests at the document just uploaded.\nif (insomnia.response.code === 201) {\n  const body = insomnia.response.json();\n  insomnia.environment.set(\"document_id\", body.id);\n  console.log(\"document_id =\", body.id, \"status =\", body.status, \"chunks =\", body.chunk_count);\n}\n"
+    },
+    {
+      "_id": "req_documents_list",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "List documents",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.base_url }}/documents/?limit=20&offset=0",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 8,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_documents_detail",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "Document detail",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.base_url }}/documents/{{ _.document_id }}/",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 9,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_documents_chunks",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "Document chunks",
+      "description": "Learning aid: exactly what the splitter produced.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/documents/{{ _.document_id }}/chunks/?limit=50",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 10,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_documents_reindex",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "Reindex document",
+      "description": "",
+      "method": "POST",
+      "url": "{{ _.base_url }}/documents/{{ _.document_id }}/reindex/",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 11,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_documents_delete",
+      "_type": "request",
+      "parentId": "fld_documents",
+      "name": "Delete document",
+      "description": "",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/documents/{{ _.document_id }}/delete/",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 12,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_rag",
+      "_type": "request_group",
+      "parentId": "wrk_documento",
+      "name": "3. RAG",
+      "metaSortKey": 13
+    },
+    {
+      "_id": "req_rag_search",
+      "_type": "request",
+      "parentId": "fld_rag",
+      "name": "Search (retrieval only)",
+      "description": "No LLM. Shows which chunks a question retrieves and their cosine similarity.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/search/",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"question\": \"what does documento do?\",\n  \"top_k\": 5\n}"
+      },
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 14,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_rag_ask",
+      "_type": "request",
+      "parentId": "fld_rag",
+      "name": "Ask (full RAG)",
+      "description": "Retrieve -> prompt -> LLM. Needs LLM_MODEL + its API key in .env. Optional: \"document_ids\": [\"<uuid>\"] to restrict retrieval.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/ask/",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"question\": \"what does documento do?\",\n  \"top_k\": 5\n}"
+      },
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 15,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_rag_queries",
+      "_type": "request",
+      "parentId": "fld_rag",
+      "name": "Query history",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.base_url }}/queries/?limit=20",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}",
+        "prefix": "Bearer"
+      },
+      "metaSortKey": 16,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    }
+  ]
+}

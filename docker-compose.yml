@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: documento-db
+    environment:
+      POSTGRES_DB: documento
+      POSTGRES_USER: documento
+      POSTGRES_PASSWORD: documento
+    # 5432 on the host is taken by a local Homebrew Postgres, so expose on 5433.
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documento -d documento"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
